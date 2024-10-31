@@ -45,8 +45,13 @@ def preprocess_image(image):
         raise
 
 def split_combined_items(line):
-    """Split items that are combined with '+'"""
-    items = [item.strip() for item in line.split('+')]
+    """Split items that are combined with '+' or ','"""
+    # First replace '+' with ',' for uniform processing
+    line = line.replace('+', ',')
+    # Split by comma and clean each item
+    items = [item.strip() for item in line.split(',')]
+    # Filter out empty items
+    items = [item for item in items if item]
     return items
 
 def process_single_item(item_text):
@@ -106,8 +111,8 @@ async def process_image(file: UploadFile = File(...)):
             if not line.strip():
                 continue
             
-            # Check if line contains multiple items (separated by +)
-            if '+' in line:
+            # Check if line contains separators (+ or ,)
+            if '+' in line or ',' in line:
                 combined_items = split_combined_items(line)
                 for item in combined_items:
                     processed_item = process_single_item(item)
