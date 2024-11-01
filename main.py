@@ -20,10 +20,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Enhanced OCR corrections dictionary
 ocr_corrections = {
     "Oi": "Oil",
     "Potatc": "Potato",
     "0nion": "Onion",
+    "Chines": "Chinese",
+    "Chicken Bonles": "Chicken Boneless",
+    "Bazal Leave": "Basil Leaves",
+    "Casor": "Kasoor",
+    "Capckm": "Capsicum",
+    "Comber": "Cucumber",
+    "Green Patta": "Green Leaves",
+    "Salad Patta": "Salad Leaves",
 }
 
 def preprocess_image(image):
@@ -62,8 +71,8 @@ def process_single_item(item_text):
     if not item_text:
         return None
     
-    # Match pattern for item name and quantity
-    pattern = r"(\D+?)\s*(\d*\.?\d*\s*(?:kg|g|liters?|l|ml)?)?\s*$"
+    # Enhanced pattern to handle more variations
+    pattern = r"(.*?)\s*(\d+(?:\.\d+)?(?:\s*(?:kg|g|gr|pkt|lit|can|piece|pieces|pcs))?)?(?:\s*(?:V))?$"
     match = re.match(pattern, item_text, re.IGNORECASE)
     
     if match:
@@ -71,10 +80,18 @@ def process_single_item(item_text):
         
         # Clean and correct item name
         itemname = itemname.strip().title()
-        itemname = ocr_corrections.get(itemname, itemname)
+        
+        # Apply OCR corrections
+        for key, value in ocr_corrections.items():
+            if key.lower() in itemname.lower():
+                itemname = itemname.replace(key, value)
         
         # Clean quantity
-        quantity = quantity.strip() if quantity else ""
+        if quantity:
+            # Normalize quantity (remove extra spaces)
+            quantity = re.sub(r'\s+', '', quantity)
+        else:
+            quantity = ""
         
         # Only return items with valid names
         if len(itemname) > 1:  # Avoid single-letter items
@@ -92,7 +109,7 @@ async def process_image(file: UploadFile = File(...)):
         processed_image = preprocess_image(image)
         
         # Fixed Tesseract configuration
-        custom_config = '--oem 3 --psm 6'
+        custom_config = '--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.()-'
         
         # Extract text
         extracted_text = pytesseract.image_to_string(
@@ -107,8 +124,8 @@ async def process_image(file: UploadFile = File(...)):
         
         # Process each line
         for line in extracted_text.splitlines():
-            # Skip empty lines
-            if not line.strip():
+            # Skip empty lines and very short lines
+            if not line.strip() or len(line.strip()) < 3:
                 continue
             
             # Check if line contains separators (+ or ,)
